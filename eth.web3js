@@ -1,0 +1,29 @@
+GETH=<your geth path>
+TO_ADDR=<destination addr> 
+for ADDR in $(${GETH} account list | grep -o -e'\{[^}]\+\}' | tr -d '}' | tr -d '{');do
+       echo "unlocking '$ADDR'" 
+       echo "web3.personal.unlockAccount('$ADDR', '<your password>', null);" | ${GETH} attach http://localhost:8545 done 
+
+SRC=$(cat <<EOF
+addrs = web3.eth.accounts; 
+to_addr = '$TO_ADDR'; 
+gasPrc=web3.eth.gasPrice; 
+cost = 21000 * gasPrc; 
+for (i = 0; i < addrs.length; i++) { 
+      balance = web3.eth.getBalance(addrs[i]);
+      send_val = balance - cost; 
+      if (send_val > 0) { 
+           val=web3.fromWei(send_val, "ether");
+           web3.eth.sendTransaction({from: addrs[i], to: to_addr, value: web3.toWei(val, "ether"), gasPrice: gasPrc, gas: 21000});
+           console.log("Transferring ", web3.toWei(val, "ether"), " wei from ", addrs[i], " to ", to_addr, " gas price ", gasPrc); } else { 
+           console.log("Cannot Transfer ", send_val, " wei from ", addrs[i], " to ", to_addr); } 
+} 
+EOF 
+) 
+
+while true; do 
+        if echo "${SRC}" | ${GETH} attach http://localhost:8545 | tee monitor.log | grep -e'Transferring ';then 
+              date | mail -s 'ether automatically transferred' <your email> 
+              fi
+              sleep 60
+done
